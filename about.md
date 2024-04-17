@@ -1,7 +1,7 @@
 ### About the Classifier
 The classifier is a [convolutional neural network](https://en.wikipedia.org/wiki/Convolutional_neural_network) trained on over 10,000 hours of Carnatic audio sourced from this incredible [YouTube collection](https://ramanarunachalam.github.io/Music/Carnatic/carnatic.html).
 ### Key Features:
-- Can identify **150 ragas**
+- Can identify **150 ragas** most commonly found on YouTube
 - Does not require any information about the **shruthi (tonic pitch)** of the recording.
 - **Compatible** with male/female vocal or instrumental recordings.
 
