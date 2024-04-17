@@ -37,7 +37,7 @@ if __name__ == '__main__':
         with gr.Tab("Classifier"):
             gr.Interface(
             title="Carnatic Raga Classifier",
-            description="**Welcome!** This is a deep-learning based raga classifier. Simply upload or record an audio clip to test it out (uploading is more reliable). \n",
+            description="**Welcome!** This is a deep-learning based raga classifier. Upload or record an audio clip to test it out. Provide at least 30 seconds of audio for best results. Wait for the audio waves to appear (and stay) before clicking Submit! \n",
             article = "**Get in Touch:** Feel free to reach out to [me](https://sanjeevraja.com/) via email (sanjeevr AT berkeley DOT edu) with any questions or feedback! ",
             fn=evaluator.inference,
             inputs=[
