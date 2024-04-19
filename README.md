@@ -1,7 +1,6 @@
 ---
 title: Carnatic Raga Classifier
 emoji: 📈
-thumbnail: site/logo.jpeg
 colorFrom: pink
 colorTo: green
 sdk: gradio
