@@ -37,7 +37,7 @@ if __name__ == '__main__':
         with gr.Tab("Classifier"):
             gr.Interface(
             title="Carnatic Raga Classifier",
-            description="**Welcome!** This app uses AI to recognize Carnatic ragas. Upload or record an audio clip to test it out. Provide at least 30 seconds of audio for best results. Wait for the audio waves to appear and remain before clicking Submit! \n",
+            description="**Welcome!** This app uses AI to recognize Carnatic ragas. Upload or record an audio clip to test it out. <br> Provide at least **30 seconds** of audio for best results (**the more audio you provide, the higher the accuracy**). <br> Wait for the audio waves to appear and remain before clicking Submit.",
             article = "**Get in Touch:** Feel free to reach out to [me](https://sanjeevraja.com/) via email (sanjeevr AT berkeley DOT edu) with any questions or feedback, or start a discussion in the Community tab! ",
             inputs=[
                 gr.Slider(minimum = 1, maximum = 150, value = 5, label = "Number of displayed ragas", info = "Choose number of top predictions to display"), 
