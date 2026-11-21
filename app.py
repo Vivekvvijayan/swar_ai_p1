@@ -1,4 +1,5 @@
 ﻿import os
+os.environ["GRADIO_NODE_PATH"] = ""
 import argparse
 import torch
 from fastapi.responses import JSONResponse, FileResponse
@@ -112,6 +113,7 @@ def _custom_create_app(*args, **kwargs):
     )
 
     @app.get("/api/tunes/{raga_name}")
+    @app.get("/gradio_api/api/tunes/{raga_name}")
     async def get_raga_tunes(raga_name: str):
         try:
             result = generate_tunes_for_raga(raga_name, TUNES_DIR)
@@ -120,6 +122,7 @@ def _custom_create_app(*args, **kwargs):
             return JSONResponse(status_code=500, content={"error": str(e)})
 
     @app.delete("/api/tunes/{raga_name}")
+    @app.delete("/gradio_api/api/tunes/{raga_name}")
     async def delete_raga_tunes(raga_name: str):
         try:
             deleted = cleanup_raga_audio_files(raga_name, TUNES_DIR)
@@ -128,6 +131,7 @@ def _custom_create_app(*args, **kwargs):
             return JSONResponse(status_code=500, content={"error": str(e)})
 
     @app.post("/api/tunes/cleanup/{raga_name}")
+    @app.post("/gradio_api/api/tunes/cleanup/{raga_name}")
     async def cleanup_tunes_post(raga_name: str):
         try:
             deleted = cleanup_raga_audio_files(raga_name, TUNES_DIR)
@@ -136,6 +140,7 @@ def _custom_create_app(*args, **kwargs):
             return JSONResponse(status_code=500, content={"error": str(e)})
 
     @app.get("/api/audio/{filename}")
+    @app.get("/gradio_api/api/audio/{filename}")
     async def get_audio_file(filename: str):
         file_path = os.path.join(TUNES_DIR, filename)
         if os.path.exists(file_path):
