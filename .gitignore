@@ -10,3 +10,5 @@ env/
 *.swp
 *.swo
 .DS_Store
+generated_tunes/
+*.wav
