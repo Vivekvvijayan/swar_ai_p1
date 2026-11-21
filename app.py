@@ -7,6 +7,9 @@ import gradio as gr
 from utils.YParams import YParams
 from inference import Evaluator
 from tune_generator import generate_tunes_for_raga, cleanup_raga_audio_files
+from gradio.routes import App
+
+_orig_create_app = App.create_app
 
 try:
     import spaces
@@ -96,53 +99,55 @@ def build_gradio_demo():
     return demo_blocks
 
 
+@staticmethod
+def _custom_create_app(*args, **kwargs):
+    app = _orig_create_app(*args, **kwargs)
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @app.get("/api/tunes/{raga_name}")
+    async def get_raga_tunes(raga_name: str):
+        try:
+            result = generate_tunes_for_raga(raga_name, TUNES_DIR)
+            return JSONResponse(content=result)
+        except Exception as e:
+            return JSONResponse(status_code=500, content={"error": str(e)})
+
+    @app.delete("/api/tunes/{raga_name}")
+    async def delete_raga_tunes(raga_name: str):
+        try:
+            deleted = cleanup_raga_audio_files(raga_name, TUNES_DIR)
+            return JSONResponse(content={"status": "cleaned", "raga": raga_name, "files_deleted": deleted})
+        except Exception as e:
+            return JSONResponse(status_code=500, content={"error": str(e)})
+
+    @app.post("/api/tunes/cleanup/{raga_name}")
+    async def cleanup_tunes_post(raga_name: str):
+        try:
+            deleted = cleanup_raga_audio_files(raga_name, TUNES_DIR)
+            return JSONResponse(content={"status": "cleaned", "raga": raga_name, "files_deleted": deleted})
+        except Exception as e:
+            return JSONResponse(status_code=500, content={"error": str(e)})
+
+    @app.get("/api/audio/{filename}")
+    async def get_audio_file(filename: str):
+        file_path = os.path.join(TUNES_DIR, filename)
+        if os.path.exists(file_path):
+            return FileResponse(file_path, media_type="audio/wav")
+        return JSONResponse(status_code=404, content={"error": "Audio file not found"})
+
+    return app
+
+App.create_app = _custom_create_app
+
 # 3. Create the Gradio App
 demo = build_gradio_demo()
-
-# Enable CORS on the underlying FastAPI server
-demo.app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# 4. Mount Custom REST Endpoints on demo.app for Mobile App Integration
-@demo.app.get("/api/tunes/{raga_name}")
-async def get_raga_tunes(raga_name: str):
-    try:
-        result = generate_tunes_for_raga(raga_name, TUNES_DIR)
-        return JSONResponse(content=result)
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@demo.app.delete("/api/tunes/{raga_name}")
-async def delete_raga_tunes(raga_name: str):
-    try:
-        deleted = cleanup_raga_audio_files(raga_name, TUNES_DIR)
-        return JSONResponse(content={"status": "cleaned", "raga": raga_name, "files_deleted": deleted})
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@demo.app.post("/api/tunes/cleanup/{raga_name}")
-async def cleanup_tunes_post(raga_name: str):
-    try:
-        deleted = cleanup_raga_audio_files(raga_name, TUNES_DIR)
-        return JSONResponse(content={"status": "cleaned", "raga": raga_name, "files_deleted": deleted})
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@demo.app.get("/api/audio/{filename}")
-async def get_audio_file(filename: str):
-    file_path = os.path.join(TUNES_DIR, filename)
-    if os.path.exists(file_path):
-        return FileResponse(file_path, media_type="audio/wav")
-    return JSONResponse(status_code=404, content={"error": "Audio file not found"})
 
 
 if __name__ == "__main__":
