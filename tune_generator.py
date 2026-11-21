@@ -392,3 +392,21 @@ def generate_tunes_for_raga(raga_name: str, output_dir: str, base_url: str = "")
         "count": len(tunes),
         "tunes": tunes
     }
+def cleanup_raga_audio_files(raga_name: str, output_dir: str):
+    """
+    Deletes all generated WAV audio files for a given raga from server storage.
+    Frees disk memory immediately when the mobile client changes raga or navigates away.
+    """
+    clean_name = re.sub(r"[^a-zA-Z0-9]", "_", raga_name).lower()
+    deleted_count = 0
+    if os.path.exists(output_dir):
+        for fname in os.listdir(output_dir):
+            if (fname.startswith(f"{clean_name}_tune_") or fname.startswith(clean_name)) and fname.endswith(".wav"):
+                fpath = os.path.join(output_dir, fname)
+                try:
+                    os.remove(fpath)
+                    deleted_count += 1
+                except Exception:
+                    pass
+    return deleted_count
+
