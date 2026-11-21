@@ -1,56 +1,59 @@
-import os
-from inference import Evaluator
+﻿import os
 import argparse
-from utils.YParams import YParams
 import torch
 import gradio as gr
-
-def read_markdown_file(path):
-    with open(path, 'r', encoding='utf-8') as file:
-        return file.read()
+from utils.YParams import YParams
+from inference import Evaluator
 
 
-if __name__ == '__main__':
-
-    #parse args
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--yaml_config", default='config.yaml', type=str)
-    parser.add_argument("--config", default='resnet_0.7', type=str)
-
-    args = parser.parse_args()
-    params = YParams(os.path.abspath(args.yaml_config), args.config)
-
-    #GPU stuff
-    try:
-        params.device = torch.device(torch.cuda.current_device())
-    except:
-        params.device = "cpu"
-    
-    #checkpoint stuff
-    expDir = "ckpts/resnet_0.7/150classes_alldata_cliplength30"
-    params['checkpoint_path'] = os.path.join(expDir, 'training_checkpoints/ckpt.tar')
-    params['best_checkpoint_path'] = os.path.join(expDir, 'training_checkpoints/best_ckpt.tar')
-
+def build_app(params):
     evaluator = Evaluator(params)
 
-    with gr.Blocks() as demo:
-        with gr.Tab("Classifier"):
-            gr.Interface(
-            title="Carnatic Raga Classifier",
-            description="**Welcome!** This app uses AI to recognize Carnatic ragas. Upload or record an audio clip to test it out. <br> Provide at least **30 seconds** of audio for best results (**the more audio you provide, the higher the accuracy**). <br> Wait for the audio waves to appear and remain before clicking Submit.",
-            article = "**Get in Touch:** Feel free to reach out to [me](https://sanjeevraja.com/) via email (sanjeevr AT berkeley DOT edu) with any questions or feedback, or start a discussion in the Community tab! ",
-            inputs=[
-                gr.Slider(minimum = 1, maximum = 150, value = 5, label = "Number of displayed ragas", info = "Choose number of top predictions to display"), 
-                gr.Audio()
-                ],
-            fn=evaluator.inference,
-            outputs="label"
+    demo = gr.Interface(
+        title="Carnatic Raga AI Classifier",
+        description="End-to-End AI-based Melodic Classifier for 150 Carnatic Ragas (ResNet Deep Audio Architecture).",
+        inputs=[
+            gr.Slider(
+                minimum=1,
+                maximum=150,
+                value=5,
+                step=1,
+                label="Top K Ragas",
+                info="Number of ranked raga candidates to return"
+            ),
+            gr.Audio(
+                label="Audio Sample (Live Mic or WAV/MP3 Upload)"
             )
-            
-        with gr.Tab("About"):
-            gr.Markdown(read_markdown_file('about.md'))
-            gr.Image('site/tsne.jpeg', height = 800, width=800)
+        ],
+        fn=evaluator.inference,
+        outputs=gr.Label(label="Predicted Ragas & Confidence"),
+        api_name="inference",
+        flagging_mode="never"
+    )
 
-    demo.launch(server_name="192.168.1.17", server_port=7860)
+    return demo
 
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Carnatic Raga Recognition AI Model Server")
+    parser.add_argument("--yaml_config", default="config.yaml", type=str, help="Path to config yaml")
+    parser.add_argument("--config", default="resnet_0.7", type=str, help="Configuration profile name")
+    parser.add_argument("--host", default="0.0.0.0", type=str, help="Server bind host")
+    parser.add_argument("--port", default=7860, type=int, help="Server bind port")
+    args = parser.parse_args()
+
+    params = YParams(os.path.abspath(args.yaml_config), args.config)
+
+    # Device selection (GPU if available, otherwise CPU)
+    if torch.cuda.is_available():
+        params.device = torch.device(torch.cuda.current_device())
+    else:
+        params.device = torch.device("cpu")
+
+    # Set checkpoint path
+    exp_dir = os.path.join("ckpts", "resnet_0.7", "150classes_alldata_cliplength30", "training_checkpoints")
+    params.best_checkpoint_path = os.path.join(exp_dir, "best_ckpt.tar")
+
+    print(f"Starting Carnatic Raga Server on {args.host}:{args.port} using device: {params.device}")
+    app = build_app(params)
+    app.launch(server_name=args.host, server_port=args.port)
