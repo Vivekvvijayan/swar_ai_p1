@@ -1,8 +1,10 @@
 ﻿import os
 import argparse
 import torch
-import gradio as gr
+import uvicorn
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse, FileResponse
+import gradio as gr
 from utils.YParams import YParams
 from inference import Evaluator
 from tune_generator import generate_tunes_for_raga
@@ -10,11 +12,33 @@ from tune_generator import generate_tunes_for_raga
 TUNES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "generated_tunes")
 os.makedirs(TUNES_DIR, exist_ok=True)
 
+# 1. Initialize FastAPI Server
+server = FastAPI(
+    title="Carnatic Raga AI Server",
+    description="Backend API powering Carnatic Raga Recognition & Sanchara Melody Generation"
+)
 
-def build_app(params):
+# 2. REST Endpoints for Mobile App Integration
+@server.get("/api/tunes/{raga_name}")
+async def get_raga_tunes(raga_name: str):
+    try:
+        result = generate_tunes_for_raga(raga_name, TUNES_DIR)
+        return JSONResponse(content=result)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@server.get("/api/audio/{filename}")
+async def get_audio_file(filename: str):
+    file_path = os.path.join(TUNES_DIR, filename)
+    if os.path.exists(file_path):
+        return FileResponse(file_path, media_type="audio/wav")
+    return JSONResponse(status_code=404, content={"error": "Audio file not found"})
+
+
+def build_gradio_demo(params):
     evaluator = Evaluator(params)
 
-    # 1. Classifier Interface
+    # Classifier Interface
     classifier_interface = gr.Interface(
         title="Carnatic Raga AI Classifier",
         description="End-to-End AI-based Melodic Classifier for 150 Carnatic Ragas (ResNet Deep Audio Architecture).",
@@ -37,7 +61,7 @@ def build_app(params):
         flagging_mode="never"
     )
 
-    # 2. Web UI Tune Generator Function
+    # Web UI Tune Generator Interface
     def web_generate_tunes(raga_name):
         res = generate_tunes_for_raga(raga_name or "Mohanam", TUNES_DIR)
         tunes = res["tunes"]
@@ -45,13 +69,12 @@ def build_app(params):
         for t in tunes:
             details += f"- **Tune {t['id']} ({t['title']}):** `{t['swaras']}`\n"
             details += f"  *{t['description']}*\n\n"
-        # Return first tune path for the audio player
         first_audio = os.path.join(TUNES_DIR, tunes[0]["filename"])
         return details, first_audio
 
     tune_interface = gr.Interface(
         title="AI Carnatic Raga Tune Generator",
-        description="Generate random authentic melodic phrases (sancharas) and scale cadences in any Carnatic raga with Tanpura drone.",
+        description="Generate authentic melodic phrases (sancharas) and scale cadences in any Carnatic raga with Tanpura accompaniment.",
         inputs=[
             gr.Textbox(label="Carnatic Raga Name", value="Mohanam", placeholder="e.g. Mohanam, Kalyani, Hamsadhwani, Shankarabharanam")
         ],
@@ -68,22 +91,6 @@ def build_app(params):
             classifier_interface.render()
         with gr.Tab("Raga Tune Generator"):
             tune_interface.render()
-
-    # Mount REST API Endpoints on the FastAPI app instance for Mobile Integration
-    @demo.app.get("/api/tunes/{raga_name}")
-    async def get_raga_tunes(raga_name: str):
-        try:
-            result = generate_tunes_for_raga(raga_name, TUNES_DIR)
-            return JSONResponse(content=result)
-        except Exception as e:
-            return JSONResponse(status_code=500, content={"error": str(e)})
-
-    @demo.app.get("/api/audio/{filename}")
-    async def get_audio_file(filename: str):
-        file_path = os.path.join(TUNES_DIR, filename)
-        if os.path.exists(file_path):
-            return FileResponse(file_path, media_type="audio/wav")
-        return JSONResponse(status_code=404, content={"error": "Audio file not found"})
 
     return demo
 
@@ -107,6 +114,9 @@ if __name__ == "__main__":
     exp_dir = os.path.join("ckpts", "resnet_0.7", "150classes_alldata_cliplength30", "training_checkpoints")
     params.best_checkpoint_path = os.path.join(exp_dir, "best_ckpt.tar")
 
+    # Build Gradio Demo and mount onto FastAPI server
+    demo = build_gradio_demo(params)
+    app = gr.mount_gradio_app(server, demo, path="/")
+
     print(f"Starting Carnatic Raga Server on {args.host}:{args.port} using device: {params.device}")
-    app = build_app(params)
-    app.launch(server_name=args.host, server_port=args.port)
+    uvicorn.run(app, host=args.host, port=args.port)
