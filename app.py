@@ -8,6 +8,14 @@ from utils.YParams import YParams
 from inference import Evaluator
 from tune_generator import generate_tunes_for_raga, cleanup_raga_audio_files
 
+try:
+    import spaces
+    def gpu_decorator(fn):
+        return spaces.GPU(fn)
+except Exception:
+    def gpu_decorator(fn):
+        return fn
+
 TUNES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "generated_tunes")
 os.makedirs(TUNES_DIR, exist_ok=True)
 
@@ -23,17 +31,16 @@ else:
 exp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ckpts", "resnet_0.7", "150classes_alldata_cliplength30", "training_checkpoints")
 params.best_checkpoint_path = os.path.join(exp_dir, "best_ckpt.tar")
 
+# Initialize inference evaluator
+evaluator = Evaluator(params)
+
+@gpu_decorator
+def predict_raga_audio(k, audio):
+    return evaluator.inference(k, audio)
+
 
 # 2. Build Gradio Interface
-def build_gradio_demo(params):
-    evaluator = Evaluator(params)
-
-    try:
-        import spaces
-        predict_fn = spaces.GPU(evaluator.inference)
-    except Exception:
-        predict_fn = evaluator.inference
-
+def build_gradio_demo():
     classifier_interface = gr.Interface(
         title="Carnatic Raga AI Classifier",
         description="End-to-End AI-based Melodic Classifier for 150 Carnatic Ragas (ResNet Deep Audio Architecture).",
@@ -50,7 +57,7 @@ def build_gradio_demo(params):
                 label="Audio Sample (Live Mic or WAV/MP3 Upload)"
             )
         ],
-        fn=predict_fn,
+        fn=predict_raga_audio,
         outputs=gr.Label(label="Predicted Ragas & Confidence"),
         api_name="inference",
         flagging_mode="never"
@@ -90,7 +97,7 @@ def build_gradio_demo(params):
 
 
 # 3. Create the Gradio App
-demo = build_gradio_demo(params)
+demo = build_gradio_demo()
 
 # Enable CORS on the underlying FastAPI server
 demo.app.add_middleware(

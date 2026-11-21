@@ -5,3 +5,4 @@ ruamel.yaml
 gradio
 fastapi
 uvicorn
+spaces
