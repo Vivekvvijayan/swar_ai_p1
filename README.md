@@ -1,4 +1,14 @@
-﻿# Carnatic Raga Recognition & Classification AI Server
+﻿---
+title: Carnatic Raga AI
+emoji: 🎵
+colorFrom: indigo
+colorTo: purple
+sdk: gradio
+app_file: app.py
+pinned: false
+---
+
+# Carnatic Raga Recognition & Classification AI Server
 
 Backend deep audio inference service for the Carnatic Raga Recognition Android Application.
 
@@ -7,7 +17,7 @@ Backend deep audio inference service for the Carnatic Raga Recognition Android A
 - **Classification Scope:** 150 Carnatic Ragas
 - **Target Sampling Rate:** 8,000 Hz Stereo PCM
 - **Input Clip Window:** 30 seconds
-- **Inference API:** Gradio 4 / Uvicorn REST Protocol on port `7860`
+- **Inference API:** Gradio / FastAPI REST Protocol on port `7860`
 - **Client Integration:** Compatible with Android client (`GradioServerApi`)
 
 ## Installation
