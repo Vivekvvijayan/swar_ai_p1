@@ -152,4 +152,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print(f"Starting Carnatic Raga Server on {args.host}:{args.port} using device: {params.device}")
-    demo.launch(server_name=args.host, server_port=args.port)
+    demo.launch(_app=demo.app, server_name=args.host, server_port=args.port)
