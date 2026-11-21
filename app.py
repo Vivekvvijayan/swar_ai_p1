@@ -28,6 +28,12 @@ params.best_checkpoint_path = os.path.join(exp_dir, "best_ckpt.tar")
 def build_gradio_demo(params):
     evaluator = Evaluator(params)
 
+    try:
+        import spaces
+        predict_fn = spaces.GPU(evaluator.inference)
+    except Exception:
+        predict_fn = evaluator.inference
+
     classifier_interface = gr.Interface(
         title="Carnatic Raga AI Classifier",
         description="End-to-End AI-based Melodic Classifier for 150 Carnatic Ragas (ResNet Deep Audio Architecture).",
@@ -44,7 +50,7 @@ def build_gradio_demo(params):
                 label="Audio Sample (Live Mic or WAV/MP3 Upload)"
             )
         ],
-        fn=evaluator.inference,
+        fn=predict_fn,
         outputs=gr.Label(label="Predicted Ragas & Confidence"),
         api_name="inference",
         flagging_mode="never"
