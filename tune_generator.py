@@ -1,6 +1,8 @@
 ﻿import os
 import re
 import wave
+import uuid
+import random
 import numpy as np
 
 # Carnatic Swara Frequency Multipliers relative to Tonic S (Shadjam = 1.0)
@@ -173,29 +175,27 @@ def get_raga_scale(raga_name: str):
     if clean in RAGA_SCALES:
         return RAGA_SCALES[clean]
 
-    # Partial match
     for key, scale in RAGA_SCALES.items():
         if key in clean or clean in key:
             return scale
 
-    # Default fallback: Shankarabharanam (Major Scale)
     return RAGA_SCALES["shankarabharanam"]
 
 
 def synthesize_note(freq, duration_sec, sample_rate=44100):
     t = np.linspace(0, duration_sec, int(sample_rate * duration_sec), endpoint=False)
     
-    # Harmonic additive synthesis (resembling Carnatic flute / veena resonance)
+    # Harmonic additive synthesis (Carnatic flute/veena timbre)
     harmonic1 = np.sin(2 * np.pi * freq * t)
     harmonic2 = 0.45 * np.sin(2 * np.pi * (2 * freq) * t)
     harmonic3 = 0.20 * np.sin(2 * np.pi * (3 * freq) * t)
     harmonic4 = 0.08 * np.sin(2 * np.pi * (4 * freq) * t)
     
-    # Gentle subtle vibrato/gamaka oscillation (5 Hz frequency modulation)
+    # Subtle microtonal vibrato/gamaka oscillation (5 Hz modulation)
     vibrato = 0.02 * np.sin(2 * np.pi * 5.0 * t)
     wave_signal = harmonic1 + harmonic2 + harmonic3 + harmonic4 + vibrato
 
-    # Natural ADSR Envelope (30ms attack, gentle release)
+    # Natural ADSR Envelope
     total_samples = len(t)
     attack_samples = int(0.04 * sample_rate)
     release_samples = int(0.06 * sample_rate)
@@ -222,7 +222,6 @@ def render_phrase_to_wav(swara_sequence, note_durations, output_path, tonic_freq
     total_audio = []
     for swara, dur in zip(swara_sequence, note_durations):
         if swara == "-":
-            # Musical rest / sustain pause
             silence = np.zeros(int(sample_rate * dur), dtype=np.float32)
             total_audio.append(silence)
         else:
@@ -259,24 +258,93 @@ def format_swara_display(swara_list):
     return " ".join(SWARA_DISPLAY.get(s, s) for s in swara_list)
 
 
-def generate_tunes_for_raga(raga_name: str, output_dir: str, base_url: str = ""):
-    scale = get_raga_scale(raga_name)
+def generate_probabilistic_phrase(scale, min_length=9, max_length=13, favor_upper=False):
+    """
+    Stochastic Markov phrase generator that creates unique Carnatic melodic sequences
+    honoring Arohanam/Avarohanam grammar on every single invocation.
+    """
     arohanam = scale["arohanam"]
     avarohanam = scale["avarohanam"]
     vadi = scale.get("vadi", arohanam[min(2, len(arohanam)-1)])
     samvadi = scale.get("samvadi", arohanam[min(4, len(arohanam)-1)])
 
+    target_length = random.randint(min_length, max_length)
+    phrase = []
+    durations = []
+
+    # Start note: S, Vadi, or Samvadi
+    if favor_upper:
+        curr = random.choice([samvadi, arohanam[-2]])
+    else:
+        curr = random.choice(["S", vadi])
+
+    phrase.append(curr)
+    durations.append(random.choice([0.45, 0.6]))
+
+    for i in range(target_length - 2):
+        r = random.random()
+
+        if favor_upper and i == (target_length // 2):
+            curr = "S_HIGH"
+            dur = random.choice([0.8, 1.0])
+        elif r < 0.40:
+            # Ascend along Arohanam
+            if curr in arohanam:
+                idx = arohanam.index(curr)
+                next_idx = min(len(arohanam) - 1, idx + 1)
+                curr = arohanam[next_idx]
+            else:
+                curr = random.choice(arohanam)
+            dur = random.choice([0.35, 0.45, 0.55])
+        elif r < 0.75:
+            # Descend along Avarohanam
+            if curr in avarohanam:
+                idx = avarohanam.index(curr)
+                next_idx = min(len(avarohanam) - 1, idx + 1)
+                curr = avarohanam[next_idx]
+            else:
+                curr = random.choice(avarohanam)
+            dur = random.choice([0.40, 0.50, 0.65])
+        elif r < 0.88:
+            # Linger on Vadi / Samvadi resting swara (Karvai)
+            curr = random.choice([vadi, samvadi])
+            dur = random.choice([0.75, 0.95])
+        else:
+            # Janta swara (repeated note)
+            dur = 0.35
+
+        phrase.append(curr)
+        durations.append(dur)
+
+        # Musical breath / pause
+        if random.random() < 0.18 and 2 < i < target_length - 4:
+            phrase.append("-")
+            durations.append(0.25)
+
+    # Resolution cadence back to S
+    phrase.append("S")
+    durations.append(1.2)
+
+    return phrase, durations
+
+
+def generate_tunes_for_raga(raga_name: str, output_dir: str, base_url: str = ""):
+    scale = get_raga_scale(raga_name)
+    arohanam = scale["arohanam"]
+    avarohanam = scale["avarohanam"]
+    vadi = scale.get("vadi", arohanam[min(2, len(arohanam)-1)])
+
     clean_name = re.sub(r"[^a-zA-Z0-9]", "_", raga_name).lower()
+    run_id = uuid.uuid4().hex[:5]  # Ensures unique filenames and cache-busting per generation
     tunes = []
 
-    # 1. Scale Cadence (Arohanam & Avarohanam)
+    # 1. Scale Cadence (Arohanam & Avarohanam with expressive dynamic durations)
     phrase1_swaras = arohanam + ["-"] + avarohanam
-    phrase1_durs = [0.45] * len(arohanam) + [0.3] + [0.45] * len(avarohanam)
-    # Add emphasis to end of ascent and descent
-    phrase1_durs[len(arohanam)-1] = 0.85
-    phrase1_durs[-1] = 1.1
+    phrase1_durs = [random.choice([0.4, 0.5]) for _ in arohanam] + [0.3] + [random.choice([0.4, 0.5]) for _ in avarohanam]
+    phrase1_durs[len(arohanam)-1] = 0.9  # Hold upper Shadjam
+    phrase1_durs[-1] = 1.25              # Resolving tonic note
 
-    file1 = f"{clean_name}_tune_1.wav"
+    file1 = f"{clean_name}_tune_1_{run_id}.wav"
     path1 = os.path.join(output_dir, file1)
     dur1 = render_phrase_to_wav(phrase1_swaras, phrase1_durs, path1)
     tunes.append({
@@ -289,43 +357,31 @@ def generate_tunes_for_raga(raga_name: str, output_dir: str, base_url: str = "")
         "durationSeconds": round(dur1, 2)
     })
 
-    # 2. Madhya Sthayi Sanchara (Elaboration Phrase)
-    # Build typical Carnatic middle-register sanchara around Vadi & Samvadi
-    mid_notes = [s for s in arohanam if s not in ["S", "S_HIGH"]]
-    if len(mid_notes) >= 3:
-        n1, n2, n3 = mid_notes[0], mid_notes[1], mid_notes[2]
-        phrase2_swaras = ["S", n1, n2, "-", n2, n1, n2, n3, "-", n3, n2, n1, "S"]
-        phrase2_durs = [0.4, 0.4, 0.7, 0.2, 0.35, 0.35, 0.4, 0.7, 0.25, 0.4, 0.4, 0.4, 1.2]
-    else:
-        phrase2_swaras = ["S", vadi, samvadi, "-", samvadi, vadi, "S"]
-        phrase2_durs = [0.5, 0.6, 0.8, 0.3, 0.6, 0.6, 1.2]
-
-    file2 = f"{clean_name}_tune_2.wav"
+    # 2. Dynamic Madhya Sthayi Sanchara (Stochastically generated improvisation)
+    phrase2_swaras, phrase2_durs = generate_probabilistic_phrase(scale, min_length=10, max_length=14, favor_upper=False)
+    file2 = f"{clean_name}_tune_2_{run_id}.wav"
     path2 = os.path.join(output_dir, file2)
     dur2 = render_phrase_to_wav(phrase2_swaras, phrase2_durs, path2)
     tunes.append({
         "id": 2,
         "title": "Madhya Sthayi Sanchara",
         "swaras": format_swara_display(phrase2_swaras),
-        "description": f"Characteristic melodic phrase in the middle octave highlighting the {vadi} and {samvadi} swaras.",
+        "description": f"Dynamic melodic phrase in the middle octave highlighting the {vadi} swara with spontaneous variations.",
         "filename": file2,
         "audioUrl": f"{base_url}/api/audio/{file2}" if base_url else f"/api/audio/{file2}",
         "durationSeconds": round(dur2, 2)
     })
 
-    # 3. Tara Sthayi Sanchara (Upper Register Cadence)
-    upper_note = arohanam[-2] if len(arohanam) >= 2 else "P"
-    phrase3_swaras = [vadi, samvadi, upper_note, "S_HIGH", "-", "S_HIGH", upper_note, samvadi, vadi, "S"]
-    phrase3_durs = [0.4, 0.4, 0.45, 0.9, 0.25, 0.5, 0.4, 0.4, 0.5, 1.2]
-
-    file3 = f"{clean_name}_tune_3.wav"
+    # 3. Dynamic Tara Sthayi Sanchara (Upper Register Soaring Phrase)
+    phrase3_swaras, phrase3_durs = generate_probabilistic_phrase(scale, min_length=9, max_length=12, favor_upper=True)
+    file3 = f"{clean_name}_tune_3_{run_id}.wav"
     path3 = os.path.join(output_dir, file3)
     dur3 = render_phrase_to_wav(phrase3_swaras, phrase3_durs, path3)
     tunes.append({
         "id": 3,
         "title": "Tara Sthayi Sanchara",
         "swaras": format_swara_display(phrase3_swaras),
-        "description": f"Soaring upper-octave phrase touching Tara Shadjam (Ṡ) and gracefully resolving down to Adhara Shadjam (S).",
+        "description": f"Soaring phrase touching Tara Shadjam (Ṡ) and gracefully cascading back to Adhara Shadjam (S).",
         "filename": file3,
         "audioUrl": f"{base_url}/api/audio/{file3}" if base_url else f"/api/audio/{file3}",
         "durationSeconds": round(dur3, 2)
