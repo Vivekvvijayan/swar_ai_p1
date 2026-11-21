@@ -44,14 +44,13 @@ if __name__ == '__main__':
                 gr.Audio()
                 ],
             fn=evaluator.inference,
-            outputs="label",
-            allow_flagging = False
+            outputs="label"
             )
             
         with gr.Tab("About"):
             gr.Markdown(read_markdown_file('about.md'))
             gr.Image('site/tsne.jpeg', height = 800, width=800)
 
-    demo.launch()
+    demo.launch(server_name="192.168.1.17", server_port=7860)
 
 

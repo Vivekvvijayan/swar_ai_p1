@@ -95,7 +95,7 @@ class Evaluator():
         return {k: v.item() for k, v in d.items()}
 
     def restore_checkpoint(self, checkpoint_path):
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
         try:
             self.model.load_state_dict(checkpoint['model_state'])
         except:
