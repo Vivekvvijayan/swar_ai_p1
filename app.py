@@ -4,6 +4,7 @@ import torch
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 import gradio as gr
 from utils.YParams import YParams
 from inference import Evaluator
@@ -12,14 +13,22 @@ from tune_generator import generate_tunes_for_raga
 TUNES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "generated_tunes")
 os.makedirs(TUNES_DIR, exist_ok=True)
 
-# 1. Initialize FastAPI Server
+# 1. Initialize FastAPI Server with CORS
 server = FastAPI(
     title="Carnatic Raga AI Server",
     description="Backend API powering Carnatic Raga Recognition & Sanchara Melody Generation"
 )
 
+server.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # 2. REST Endpoints for Mobile App Integration
-@server.get("/api/tunes/{raga_name}")
+@server.api_route("/api/tunes/{raga_name}", methods=["GET", "HEAD"])
 async def get_raga_tunes(raga_name: str):
     try:
         result = generate_tunes_for_raga(raga_name, TUNES_DIR)
@@ -27,7 +36,7 @@ async def get_raga_tunes(raga_name: str):
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-@server.get("/api/audio/{filename}")
+@server.api_route("/api/audio/{filename}", methods=["GET", "HEAD"])
 async def get_audio_file(filename: str):
     file_path = os.path.join(TUNES_DIR, filename)
     if os.path.exists(file_path):
